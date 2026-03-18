@@ -45,6 +45,14 @@ model Beneficiary {
   createdAt    DateTime      @default(now())
 }
 
+model BeneficiaryOTP {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 model DeathReport {
   id                 String      @id @default(cuid())
   userId             String
