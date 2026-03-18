@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/check-inactivity",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/check-death-reports",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

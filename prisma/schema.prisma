@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  password      String
+  name          String
+  lastLoginAt   DateTime      @default(now())
+  aliveToken    String?       @unique
+  aliveCheckAt  DateTime?     // when we sent the "are you alive?" email
+  assets        Asset[]
+  beneficiaries Beneficiary[]
+  deathReports  DeathReport[]
+  createdAt     DateTime      @default(now())
+}
+
+model Asset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  type        String   // bank, investment, property, crypto, insurance, other
+  description String?
+  value       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Beneficiary {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  email        String
+  token        String        @unique @default(cuid())
+  deathReports DeathReport[]
+  createdAt    DateTime      @default(now())
+}
+
+model DeathReport {
+  id                 String      @id @default(cuid())
+  userId             String
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  beneficiaryId      String
+  beneficiary        Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  reportedAt         DateTime    @default(now())
+  confirmEmailSentAt DateTime?
+  status             String      @default("pending") // pending, dismissed, triggered
+}
