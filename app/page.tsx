@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 
@@ -10,6 +10,13 @@ export default function Home() {
   const [form, setForm] = useState({ name: "", email: "", password: "" })
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [userExists, setUserExists] = useState(true) // default true = hide register
+
+  useEffect(() => {
+    fetch("/api/user-exists")
+      .then((r) => r.json())
+      .then((d) => setUserExists(d.exists))
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,21 +76,23 @@ export default function Home() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <div className="flex border-b border-gray-200 mb-6">
-            {(["login", "register"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setError("") }}
-                className={`flex-1 pb-3 text-sm font-medium capitalize transition-colors ${
-                  tab === t
-                    ? "border-b-2 border-gray-900 text-gray-900"
-                    : "text-gray-400 hover:text-gray-600"
-                }`}
-              >
-                {t === "login" ? "Sign In" : "Create Account"}
-              </button>
-            ))}
-          </div>
+          {!userExists && (
+            <div className="flex border-b border-gray-200 mb-6">
+              {(["login", "register"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { setTab(t); setError("") }}
+                  className={`flex-1 pb-3 text-sm font-medium capitalize transition-colors ${
+                    tab === t
+                      ? "border-b-2 border-gray-900 text-gray-900"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  {t === "login" ? "Sign In" : "Create Account"}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={tab === "login" ? handleLogin : handleRegister} className="space-y-4">
             {tab === "register" && (
