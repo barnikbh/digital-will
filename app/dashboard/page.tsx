@@ -46,6 +46,14 @@ export default function Dashboard() {
     if (status === "authenticated") fetchAll()
   }, [status])
 
+  // Auto-logout when session expires (poll every 30s)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (status === "unauthenticated") router.push("/")
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [status, router])
+
   const fetchAll = async () => {
     const [a, b] = await Promise.all([
       fetch("/api/assets").then((r) => r.json()),
@@ -363,7 +371,7 @@ export default function Dashboard() {
               If you don't respond within 7 days, assets are sent to all beneficiaries.
             </li>
             <li>
-              If a beneficiary emails <strong>"barnik is dead"</strong> to your designated inbox,
+              If a beneficiary emails <strong>"barnik is dead"</strong> to <strong>dead@barnikbh.com</strong>,
               you'll receive an "are you alive?" email. If you don't confirm within{" "}
               <strong>3 days</strong>, assets are sent.
             </li>
