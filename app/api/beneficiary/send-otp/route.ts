@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { Resend } from "resend"
+import { rateLimit, getIP } from "@/lib/rate-limit"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: Request) {
+  // Max 5 OTP requests per IP per 15 minutes
+  if (!rateLimit(getIP(req), 5, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests. Please wait 15 minutes." }, { status: 429 })
+  }
+
   const { email } = await req.json()
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 })
 
