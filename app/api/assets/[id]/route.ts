@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { encryptField, decryptAsset } from "@/lib/crypto"
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -15,9 +16,15 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const { name, type, description, value, notes } = await req.json()
   const updated = await prisma.asset.update({
     where: { id: params.id },
-    data: { name, type, description, value, notes },
+    data: {
+      name: encryptField(name) ?? name,
+      type,
+      description: encryptField(description),
+      value: encryptField(value),
+      notes: encryptField(notes),
+    },
   })
-  return NextResponse.json(updated)
+  return NextResponse.json(decryptAsset(updated))
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {

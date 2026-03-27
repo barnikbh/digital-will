@@ -8,13 +8,14 @@ import { randomBytes } from "crypto"
 // with the route filter matching your designated inbox address
 
 export async function POST(req: Request) {
-  // Verify the request is from Mailgun using the signing key
+  // Verify the request is from Mailgun using the signing key (mandatory)
   const secret = process.env.INBOUND_WEBHOOK_SECRET
-  if (secret) {
-    const authHeader = req.headers.get("x-inbound-secret")
-    if (authHeader !== secret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  if (!secret) {
+    return NextResponse.json({ error: "Server misconfiguration: INBOUND_WEBHOOK_SECRET not set" }, { status: 500 })
+  }
+  const authHeader = req.headers.get("x-inbound-secret")
+  if (authHeader !== secret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   let body: Record<string, string>

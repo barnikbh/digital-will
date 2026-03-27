@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
+import { rateLimit, getIP } from "@/lib/rate-limit"
 
 export async function POST(req: Request) {
+  // Rate limit: max 10 OTP attempts per IP per 15 minutes (6-digit OTP brute-force protection)
+  const ip = getIP(req)
+  if (!rateLimit(ip, 10, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many attempts. Please wait 15 minutes." }, { status: 429 })
+  }
+
   const { email, otp } = await req.json()
   if (!email || !otp) return NextResponse.json({ error: "Email and OTP required" }, { status: 400 })
 

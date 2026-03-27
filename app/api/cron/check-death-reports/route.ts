@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { sendAssetsEmail } from "@/lib/email"
+import { decryptAsset } from "@/lib/crypto"
 
 // Vercel Cron: runs daily at 9am UTC
 // Checks for pending death reports where the user didn't respond within 3 days
@@ -42,8 +43,8 @@ export async function GET(req: Request) {
       continue
     }
 
-    // Send assets email
-    await sendAssetsEmail(user.beneficiaries, user.assets, user.name)
+    // Send assets email (decrypt fields before sending)
+    await sendAssetsEmail(user.beneficiaries, user.assets.map(decryptAsset), user.name)
 
     // Mark all pending reports for this user as triggered
     await prisma.deathReport.updateMany({

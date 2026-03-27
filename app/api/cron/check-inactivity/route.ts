@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { sendAssetsEmail, sendInactivityWarningEmail } from "@/lib/email"
 import { randomBytes } from "crypto"
+import { decryptAsset } from "@/lib/crypto"
 
 // Vercel Cron: runs daily at 9am UTC
 // vercel.json: { "crons": [{ "path": "/api/cron/check-inactivity", "schedule": "0 9 * * *" }] }
@@ -33,8 +34,8 @@ export async function GET(req: Request) {
     if (user.aliveCheckAt) {
       const daysSinceCheck = now - user.aliveCheckAt.getTime()
       if (daysSinceCheck >= DAYS_7) {
-        // Send assets email
-        await sendAssetsEmail(user.beneficiaries, user.assets, user.name)
+        // Send assets email (decrypt fields before sending)
+        await sendAssetsEmail(user.beneficiaries, user.assets.map(decryptAsset), user.name)
         results.push(`Sent assets email for ${user.email} (365d inactivity + 7d no response)`)
         continue
       }
