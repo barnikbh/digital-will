@@ -8,7 +8,7 @@ A dead man's switch for your assets. Sign in, add your asset details and benefic
 
 1. **365-day inactivity** — If you don't log in for a year, you get one warning email with an "I'm alive" link. If you don't respond within 7 days, assets are sent to all beneficiaries.
 
-2. **Beneficiary report** — Each beneficiary gets a unique link. If they click it (or email "barnik is dead" to your configured inbox), you get an "are you alive?" email. If you don't respond within 3 days, assets are sent.
+2. **Beneficiary report** — Each beneficiary gets a unique link. If they click it (or email a death trigger phrase to your configured inbox), you get an "are you alive?" email. If you don't respond within 3 days, assets are sent.
 
 Logging in at any time resets both clocks and dismisses all pending reports.
 
@@ -20,7 +20,7 @@ Logging in at any time resets both clocks and dismisses all pending reports.
 - **Prisma** + **Neon** (serverless Postgres) — database
 - **NextAuth.js** — authentication
 - **Resend** — outbound email
-- **Mailgun** — inbound email parsing (for the "barnik is dead" email trigger)
+- **Mailgun** — inbound email parsing (for the inbound email death trigger)
 - **Vercel Cron** — daily checks for inactivity and death reports
 
 ---
@@ -94,27 +94,28 @@ git push -u origin main
 3. Add all environment variables (from your `.env.local`, but update `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to your production URL)
 4. Deploy
 
-### 3. Configure your domain (barnikbh.com)
+### 3. Configure your domain
 
 In Vercel → Project → Settings → Domains:
-- Add `barnikbh.com` (or a subdomain like `will.barnikbh.com`)
+- Add your domain (or a subdomain like `will.yourdomain.com`)
 - Vercel will show you DNS records to add at your registrar
 
 Update your env vars:
 ```
-NEXTAUTH_URL=https://will.barnikbh.com
-NEXT_PUBLIC_APP_URL=https://will.barnikbh.com
+NEXTAUTH_URL=https://will.yourdomain.com
+NEXT_PUBLIC_APP_URL=https://will.yourdomain.com
 ```
 
-### 4. Set up inbound email (Mailgun) — for the "barnik is dead" email trigger
+### 4. Set up inbound email (Mailgun) — for the email death trigger
 
 1. Sign up at [mailgun.com](https://mailgun.com) (free: 100 emails/day)
-2. Add and verify `barnikbh.com` as a sending domain
+2. Add and verify your domain as a sending domain
 3. Go to **Receive** → **Create Route**:
-   - Filter: `match_recipient("dead@barnikbh.com")` (or any address you choose)
-   - Action: `forward("https://will.barnikbh.com/api/inbound-email")`
+   - Filter: `match_recipient("dead@yourdomain.com")` (or any address you choose)
+   - Action: `forward("https://will.yourdomain.com/api/inbound-email")`
 4. In your Mailgun webhook settings, set the signing key and put it in `INBOUND_WEBHOOK_SECRET`
-5. Tell your beneficiaries: email **"barnik is dead"** to `dead@barnikbh.com`
+5. Set `OWNER_NAME` to your first name (e.g. `"john"`) so trigger phrases like "john is dead" are matched
+6. Tell your beneficiaries: email a trigger phrase (e.g. **"john is dead"**) to your configured inbox
 
 ---
 
@@ -151,3 +152,4 @@ NEXT_PUBLIC_APP_URL=https://will.barnikbh.com
 | `CRON_SECRET` | Yes | Protects cron endpoints from public access |
 | `INBOUND_WEBHOOK_SECRET` | No | Validates Mailgun webhook requests |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public URL (used in beneficiary links) |
+| `OWNER_NAME` | No | Your first name — used to build email trigger phrases (e.g. "john is dead") |

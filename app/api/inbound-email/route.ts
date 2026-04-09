@@ -37,7 +37,11 @@ export async function POST(req: Request) {
   const combined = subject + " " + bodyText
 
   // Check if the email contains the death trigger phrase
-  const TRIGGER_PHRASES = ["barnik is dead", "barnik has died", "barnik passed away"]
+  // Configure OWNER_NAME in env vars (e.g. "john") to match phrases like "john is dead"
+  const ownerName = process.env.OWNER_NAME?.toLowerCase()
+  const TRIGGER_PHRASES = ownerName
+    ? [`${ownerName} is dead`, `${ownerName} has died`, `${ownerName} passed away`]
+    : ["is dead", "has died", "passed away"]
   const triggered = TRIGGER_PHRASES.some((phrase) => combined.includes(phrase))
 
   if (!triggered) {
