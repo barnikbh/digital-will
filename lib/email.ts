@@ -9,14 +9,18 @@ const APP_URL = process.env.NEXTAUTH_URL || "http://localhost:3000"
 export async function sendAssetsEmail(
   beneficiaries: Beneficiary[],
   assets: Asset[],
-  userName: string
+  userName: string,
+  testEmail?: string // if provided, send only to this address with [TEST] prefix
 ) {
-  const assetRows = assets
+  const financialAssets = assets.filter((a) => a.type !== "password")
+  const passwords = assets.filter((a) => a.type === "password")
+
+  const assetRows = financialAssets
     .map(
       (a) => `
       <tr>
         <td style="padding:8px;border:1px solid #e5e7eb;">${a.name}</td>
-        <td style="padding:8px;border:1px solid #e5e7eb;">${a.type}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;text-transform:capitalize;">${a.type}</td>
         <td style="padding:8px;border:1px solid #e5e7eb;">${a.value || "—"}</td>
         <td style="padding:8px;border:1px solid #e5e7eb;">${a.description || "—"}</td>
         <td style="padding:8px;border:1px solid #e5e7eb;">${a.notes || "—"}</td>
@@ -24,11 +28,45 @@ export async function sendAssetsEmail(
     )
     .join("")
 
+  const passwordRows = passwords
+    .map(
+      (p) => `
+      <tr>
+        <td style="padding:8px;border:1px solid #e5e7eb;">${p.name}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;">${p.description || "—"}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">${p.value || "—"}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;">${p.notes || "—"}</td>
+      </tr>`
+    )
+    .join("")
+
+  const passwordsSection = passwords.length > 0 ? `
+    <h3 style="margin-top:32px;">Passwords & Accounts</h3>
+    <table style="border-collapse:collapse;width:100%;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Service / Site</th>
+          <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Username / Email</th>
+          <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Password</th>
+          <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Notes / URL</th>
+        </tr>
+      </thead>
+      <tbody>${passwordRows}</tbody>
+    </table>` : ""
+
+  const testBanner = testEmail ? `
+    <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:12px 16px;margin-bottom:24px;">
+      <strong style="color:#92400e;">⚠ This is a test email.</strong>
+      <span style="color:#78350f;"> No death event has occurred. This was sent manually to preview what your beneficiaries would receive.</span>
+    </div>` : ""
+
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#111;">
+      ${testBanner}
       <h2 style="color:#1a1a1a;">Asset Information from ${userName}</h2>
       <p>You are receiving this message because ${userName} has designated you as a beneficiary and the conditions for sharing asset information have been met.</p>
-      <h3>Assets</h3>
+      ${financialAssets.length > 0 ? `
+      <h3>Financial Assets</h3>
       <table style="border-collapse:collapse;width:100%;">
         <thead>
           <tr style="background:#f3f4f6;">
@@ -40,19 +78,21 @@ export async function sendAssetsEmail(
           </tr>
         </thead>
         <tbody>${assetRows}</tbody>
-      </table>
+      </table>` : ""}
+      ${passwordsSection}
       <p style="margin-top:24px;color:#6b7280;font-size:12px;">This is an automated message from the Digital Will system.</p>
     </div>
   `
 
+  const subject = testEmail
+    ? `[TEST] Asset information from ${userName}`
+    : `Important: Asset information from ${userName}`
+
+  const recipients = testEmail ? [testEmail] : beneficiaries.map((b) => b.email)
+
   const results = await Promise.allSettled(
-    beneficiaries.map((b) =>
-      resend.emails.send({
-        from: FROM_EMAIL,
-        to: b.email,
-        subject: `Important: Asset information from ${userName}`,
-        html,
-      })
+    recipients.map((to) =>
+      resend.emails.send({ from: FROM_EMAIL, to, subject, html })
     )
   )
 
