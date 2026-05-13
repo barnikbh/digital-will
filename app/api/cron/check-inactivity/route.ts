@@ -8,7 +8,6 @@ import { decryptAsset } from "@/lib/crypto"
 // vercel.json: { "crons": [{ "path": "/api/cron/check-inactivity", "schedule": "0 9 * * *" }] }
 
 export async function GET(req: Request) {
-  // Verify Vercel Cron secret
   const authHeader = req.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -17,25 +16,32 @@ export async function GET(req: Request) {
   const DAYS_365 = 365 * 24 * 60 * 60 * 1000
   const DAYS_7 = 7 * 24 * 60 * 60 * 1000
   const now = Date.now()
+  const cutoff365 = new Date(now - DAYS_365)
 
+  // Only fetch users who haven't logged in for 365+ days AND whose assets haven't been sent yet
   const users = await prisma.user.findMany({
+    where: {
+      lastLoginAt: { lt: cutoff365 },
+      assetsSentAt: null,
+    },
     include: { assets: true, beneficiaries: true },
   })
 
   const results: string[] = []
 
   for (const user of users) {
-    const daysSinceLogin = now - user.lastLoginAt.getTime()
-
-    if (daysSinceLogin < DAYS_365) continue
     if (user.beneficiaries.length === 0) continue
 
     // If we already sent a warning and they still haven't logged in after 7 more days → send assets
     if (user.aliveCheckAt) {
       const daysSinceCheck = now - user.aliveCheckAt.getTime()
       if (daysSinceCheck >= DAYS_7) {
-        // Send assets email (decrypt fields before sending)
         await sendAssetsEmail(user.beneficiaries, user.assets.map(decryptAsset), user.name)
+        // Mark assetsSentAt so cron never re-fires for this user until they log in again
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { assetsSentAt: new Date(), aliveToken: null, aliveCheckAt: null },
+        })
         results.push(`Sent assets email for ${user.email} (365d inactivity + 7d no response)`)
         continue
       }

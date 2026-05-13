@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
           (req?.headers?.["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
           (req?.headers?.["x-real-ip"] as string) ||
           "unknown"
-        if (!rateLimit(ip, 10, 15 * 60 * 1000)) {
+        if (!await rateLimit(ip, 10, 15 * 60 * 1000)) {
           throw new Error("Too many login attempts. Please wait 15 minutes.")
         }
 
@@ -33,13 +33,14 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(credentials.password, user.password)
         if (!valid) return null
 
-        // Update lastLoginAt and clear any pending alive checks on login
+        // Reset all death-trigger state on login — user is confirmed alive
         await prisma.user.update({
           where: { id: user.id },
           data: {
             lastLoginAt: new Date(),
             aliveToken: null,
             aliveCheckAt: null,
+            assetsSentAt: null,
           },
         })
 
@@ -53,7 +54,7 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  session: { strategy: "jwt", maxAge: 5 * 60 }, // 5 minutes
+  session: { strategy: "jwt", maxAge: 30 * 60 }, // 30 minutes
   pages: { signIn: "/" },
   callbacks: {
     async jwt({ token, user }) {

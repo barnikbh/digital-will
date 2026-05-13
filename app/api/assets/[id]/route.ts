@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { encryptField, decryptAsset } from "@/lib/crypto"
 
+const VALID_TYPES = ["bank", "investment", "property", "crypto", "insurance", "vehicle", "other", "password"]
+
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -14,6 +16,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 
   const { name, type, description, value, notes } = await req.json()
+  if (type && !VALID_TYPES.includes(type)) {
+    return NextResponse.json({ error: "Invalid asset type" }, { status: 400 })
+  }
+
   const updated = await prisma.asset.update({
     where: { id: params.id },
     data: {

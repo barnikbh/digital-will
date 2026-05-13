@@ -6,7 +6,12 @@ const ENC_PREFIX = "enc:"
 
 function getKey(): Buffer | null {
   const key = process.env.DATA_ENCRYPTION_KEY
-  if (!key) return null // local dev — no encryption
+  if (!key) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("DATA_ENCRYPTION_KEY is required in production")
+    }
+    return null // local dev — no encryption
+  }
   const buf = Buffer.from(key, "hex")
   if (buf.length !== 32) throw new Error("DATA_ENCRYPTION_KEY must be 64 hex chars (32 bytes)")
   return buf
@@ -20,17 +25,25 @@ function encryptString(plaintext: string, key: Buffer): string {
   return `${ENC_PREFIX}${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted.toString("base64")}`
 }
 
-function decryptString(value: string, key: Buffer): string {
+function decryptString(value: string, key: Buffer): string | null {
   if (!value.startsWith(ENC_PREFIX)) return value // plaintext (pre-encryption legacy data)
   const parts = value.slice(ENC_PREFIX.length).split(":")
-  if (parts.length !== 3) return value
-  const [ivB64, authTagB64, dataB64] = parts
-  const iv = Buffer.from(ivB64, "base64")
-  const authTag = Buffer.from(authTagB64, "base64")
-  const data = Buffer.from(dataB64, "base64")
-  const decipher = createDecipheriv(ALGORITHM, key, iv)
-  decipher.setAuthTag(authTag)
-  return decipher.update(data).toString("utf8") + decipher.final("utf8")
+  if (parts.length !== 3) {
+    console.error("decryptString: malformed ciphertext, skipping field")
+    return null
+  }
+  try {
+    const [ivB64, authTagB64, dataB64] = parts
+    const iv = Buffer.from(ivB64, "base64")
+    const authTag = Buffer.from(authTagB64, "base64")
+    const data = Buffer.from(dataB64, "base64")
+    const decipher = createDecipheriv(ALGORITHM, key, iv)
+    decipher.setAuthTag(authTag)
+    return decipher.update(data).toString("utf8") + decipher.final("utf8")
+  } catch {
+    console.error("decryptString: decryption failed (tampered or wrong key), skipping field")
+    return null
+  }
 }
 
 /** Encrypts a string field. Returns null for null/empty. No-op if DATA_ENCRYPTION_KEY not set. */
@@ -41,7 +54,7 @@ export function encryptField(value: string | null | undefined): string | null {
   return encryptString(value, key)
 }
 
-/** Decrypts a string field. Returns null for null. No-op if DATA_ENCRYPTION_KEY not set. */
+/** Decrypts a string field. Returns null for null or unreadable data. */
 export function decryptField(value: string | null | undefined): string | null {
   if (value == null) return null
   const key = getKey()
@@ -53,7 +66,7 @@ export function decryptField(value: string | null | undefined): string | null {
 export function decryptAsset(asset: Asset): Asset {
   return {
     ...asset,
-    name: decryptField(asset.name) ?? asset.name,
+    name: decryptField(asset.name) ?? "",
     description: decryptField(asset.description),
     value: decryptField(asset.value),
     notes: decryptField(asset.notes),

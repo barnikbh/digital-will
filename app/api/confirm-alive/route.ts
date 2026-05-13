@@ -20,10 +20,10 @@ export async function GET(req: Request) {
     )
   }
 
-  // Mark user as alive
+  // Mark user as alive — reset all death-trigger state
   await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date(), aliveToken: null, aliveCheckAt: null },
+    data: { lastLoginAt: new Date(), aliveToken: null, aliveCheckAt: null, assetsSentAt: null },
   })
 
   // Dismiss pending death reports

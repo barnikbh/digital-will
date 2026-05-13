@@ -77,11 +77,16 @@ export default function Dashboard() {
   }, [status, router])
 
   const fetchAll = async () => {
-    const [a, p, b] = await Promise.all([
-      fetch("/api/assets").then((r) => r.json()),
-      fetch("/api/passwords").then((r) => r.json()),
-      fetch("/api/beneficiaries").then((r) => r.json()),
+    const [aRes, pRes, bRes] = await Promise.all([
+      fetch("/api/assets"),
+      fetch("/api/passwords"),
+      fetch("/api/beneficiaries"),
     ])
+    if (aRes.status === 401 || pRes.status === 401 || bRes.status === 401) {
+      router.push("/")
+      return
+    }
+    const [a, p, b] = await Promise.all([aRes.json(), pRes.json(), bRes.json()])
     setAssets(Array.isArray(a) ? a : [])
     setPasswords(Array.isArray(p) ? p : [])
     setBeneficiaries(Array.isArray(b) ? b : [])
@@ -334,7 +339,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <label className={labelCls}>Password</label>
-                <input className={inputCls} value={passwordForm.value}
+                <input className={inputCls} type="password" value={passwordForm.value}
                   onChange={(e) => setPasswordForm({ ...passwordForm, value: e.target.value })}
                   placeholder="Password" />
               </div>

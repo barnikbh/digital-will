@@ -57,12 +57,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No user found" }, { status: 404 })
   }
 
-  // Try to identify which beneficiary sent this
-  const senderEmail = (body["sender"] || body["from"] || "").toLowerCase()
-  const beneficiary = user.beneficiaries.find((b) =>
-    senderEmail.includes(b.email.toLowerCase())
-  )
-
   // Avoid duplicate pending reports
   const existingPending = await prisma.deathReport.findFirst({
     where: { userId: user.id, status: "pending" },
@@ -72,6 +66,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "Already have a pending report" })
   }
 
+  // Try to identify which beneficiary sent this
+  const senderEmail = (body["sender"] || body["from"] || "").toLowerCase()
+  const beneficiary = user.beneficiaries.find((b) =>
+    senderEmail.includes(b.email.toLowerCase())
+  )
+
   // Generate alive token
   const aliveToken = randomBytes(32).toString("hex")
   await prisma.user.update({
@@ -79,20 +79,21 @@ export async function POST(req: Request) {
     data: { aliveToken, aliveCheckAt: new Date() },
   })
 
-  // Create a death report (with or without a matched beneficiary)
-  if (beneficiary) {
-    await prisma.deathReport.create({
-      data: {
-        userId: user.id,
-        beneficiaryId: beneficiary.id,
-        confirmEmailSentAt: new Date(),
-      },
-    })
-    await sendAliveCheckEmail(user.email, user.name, aliveToken, beneficiary.name)
-  } else {
-    // Sender not in beneficiary list — still trigger the alert
-    await sendAliveCheckEmail(user.email, user.name, aliveToken, "an unknown sender")
-  }
+  // Create a death report — beneficiaryId is optional so unknown senders still get the 3-day follow-through
+  await prisma.deathReport.create({
+    data: {
+      userId: user.id,
+      beneficiaryId: beneficiary?.id ?? null,
+      confirmEmailSentAt: new Date(),
+    },
+  })
+
+  await sendAliveCheckEmail(
+    user.email,
+    user.name,
+    aliveToken,
+    beneficiary?.name ?? "an unknown sender"
+  )
 
   return NextResponse.json({ message: "Death report processed. User notified." })
 }

@@ -2,12 +2,13 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { Resend } from "resend"
 import { rateLimit, getIP } from "@/lib/rate-limit"
+import { randomInt } from "crypto"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: Request) {
   // Max 5 OTP requests per IP per 15 minutes
-  if (!rateLimit(getIP(req), 5, 15 * 60 * 1000)) {
+  if (!await rateLimit(getIP(req), 5, 15 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests. Please wait 15 minutes." }, { status: 429 })
   }
 
@@ -24,8 +25,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No beneficiary found with this email address." }, { status: 404 })
   }
 
-  // Generate 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString()
+  // Generate cryptographically secure 6-digit OTP
+  const otp = randomInt(100000, 1000000).toString()
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
   // Delete any existing OTPs for this email

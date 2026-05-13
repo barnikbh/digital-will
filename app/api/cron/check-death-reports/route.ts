@@ -43,14 +43,30 @@ export async function GET(req: Request) {
       continue
     }
 
+    // Skip if assets were already sent (e.g. inactivity trigger fired first)
+    if (user.assetsSentAt) {
+      await prisma.deathReport.updateMany({
+        where: { userId: user.id, status: "pending" },
+        data: { status: "triggered" },
+      })
+      results.push(`${user.email}: assets already sent, marked reports as triggered`)
+      continue
+    }
+
     // Send assets email (decrypt fields before sending)
     await sendAssetsEmail(user.beneficiaries, user.assets.map(decryptAsset), user.name)
 
-    // Mark all pending reports for this user as triggered
-    await prisma.deathReport.updateMany({
-      where: { userId: user.id, status: "pending" },
-      data: { status: "triggered" },
-    })
+    // Mark all pending reports and record when assets were sent
+    await Promise.all([
+      prisma.deathReport.updateMany({
+        where: { userId: user.id, status: "pending" },
+        data: { status: "triggered" },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { assetsSentAt: new Date() },
+      }),
+    ])
 
     results.push(`Sent assets email for ${user.email} (beneficiary-reported death, no response in 3 days)`)
   }

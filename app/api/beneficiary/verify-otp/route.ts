@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { rateLimit, getIP } from "@/lib/rate-limit"
+import { timingSafeEqual } from "crypto"
 
 export async function POST(req: Request) {
   // Rate limit: max 10 OTP attempts per IP per 15 minutes (6-digit OTP brute-force protection)
   const ip = getIP(req)
-  if (!rateLimit(ip, 10, 15 * 60 * 1000)) {
+  if (!await rateLimit(ip, 10, 15 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many attempts. Please wait 15 minutes." }, { status: 429 })
   }
 
@@ -18,7 +19,13 @@ export async function POST(req: Request) {
 
   if (!record) return NextResponse.json({ error: "No OTP found. Please request a new code." }, { status: 400 })
   if (new Date() > record.expiresAt) return NextResponse.json({ error: "Code expired. Please request a new one." }, { status: 400 })
-  if (record.otp !== otp) return NextResponse.json({ error: "Incorrect code. Please try again." }, { status: 400 })
+
+  // Constant-time comparison to prevent timing attacks
+  const storedBuf = Buffer.from(record.otp, "utf8")
+  const inputBuf = Buffer.from(String(otp).slice(0, 6).padEnd(6), "utf8")
+  if (storedBuf.length !== inputBuf.length || !timingSafeEqual(storedBuf, inputBuf)) {
+    return NextResponse.json({ error: "Incorrect code. Please try again." }, { status: 400 })
+  }
 
   // Valid — clean up OTP
   await prisma.beneficiaryOTP.deleteMany({ where: { email } })

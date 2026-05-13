@@ -1,23 +1,31 @@
-// Simple in-memory rate limiter
-// Tracks attempts per IP address
+import { Ratelimit } from "@upstash/ratelimit"
+import { Redis } from "@upstash/redis"
 
-const attempts = new Map<string, { count: number; resetAt: number }>()
+let redis: Redis | null = null
 
-export function rateLimit(ip: string, maxAttempts: number, windowMs: number): boolean {
-  const now = Date.now()
-  const record = attempts.get(ip)
+function getRedis(): Redis | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null
+  if (!redis) redis = Redis.fromEnv()
+  return redis
+}
 
-  if (!record || now > record.resetAt) {
-    attempts.set(ip, { count: 1, resetAt: now + windowMs })
-    return true // allowed
+const limiterCache = new Map<string, Ratelimit>()
+
+export async function rateLimit(ip: string, maxAttempts: number, windowMs: number): Promise<boolean> {
+  const r = getRedis()
+  if (!r) return true // local dev — no Redis configured, allow all
+
+  const key = `${maxAttempts}:${windowMs}`
+  if (!limiterCache.has(key)) {
+    limiterCache.set(key, new Ratelimit({
+      redis: r,
+      limiter: Ratelimit.slidingWindow(maxAttempts, `${Math.floor(windowMs / 1000)} s`),
+      prefix: "@digital-will",
+    }))
   }
 
-  if (record.count >= maxAttempts) {
-    return false // blocked
-  }
-
-  record.count++
-  return true // allowed
+  const { success } = await limiterCache.get(key)!.limit(ip)
+  return success
 }
 
 export function getIP(req: Request): string {

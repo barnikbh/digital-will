@@ -14,7 +14,8 @@ model User {
   name          String
   lastLoginAt   DateTime      @default(now())
   aliveToken    String?       @unique
-  aliveCheckAt  DateTime?     // when we sent the "are you alive?" email
+  aliveCheckAt  DateTime?
+  assetsSentAt  DateTime?
   assets        Asset[]
   beneficiaries Beneficiary[]
   deathReports  DeathReport[]
@@ -54,12 +55,12 @@ model BeneficiaryOTP {
 }
 
 model DeathReport {
-  id                 String      @id @default(cuid())
+  id                 String       @id @default(cuid())
   userId             String
-  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  beneficiaryId      String
-  beneficiary        Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
-  reportedAt         DateTime    @default(now())
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  beneficiaryId      String?
+  beneficiary        Beneficiary? @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  reportedAt         DateTime     @default(now())
   confirmEmailSentAt DateTime?
-  status             String      @default("pending") // pending, dismissed, triggered
+  status             String       @default("pending") // pending, dismissed, triggered
 }
